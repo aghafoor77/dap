@@ -1,0 +1,110 @@
+/* 
+   User Enrolement and DAP Verification
+*/
+
+// Hash function: nobody knows the inverse
+
+hashfunction hash;
+
+// User type declaration
+usertype String;
+usertype Timestamp;
+const usrPrivInfo: String;
+
+// Deifne Preexecuted cryptographic function to generate the hash of the user's private information. 
+// In the folloinwg protocol description, the value of hash(usrPrivInfoPrime, na) is equivalent to the value of veid
+macro usrPrivInfoPrime = hash(usrPrivInfo);
+
+// DAP Protocol description
+protocol DAP(User,Admin, DistLedger,Server)
+{
+	role User
+	{
+		const userPrivateInfo: String;
+		fresh ni: Nonce;
+		fresh TS: Timestamp;
+		var na: Nonce;
+		var pkA: Function;
+		const pkU: Function;
+		secret skU: Function;
+		inversekeys (pkU,skU);
+		send_1 (User,Admin, { usrPrivInfoPrime, ni} skU(User) );
+		recv_2(Admin,User, { hash(usrPrivInfoPrime, na), ni, pkU} pkA(Admin));
+		send_3 (User,Admin, { na} skU(User) );
+		send_7 (User, Server, { (hash(usrPrivInfoPrime, na), TS)} skU(User));
+		claim_!11(User,Nisynch);
+		claim_!12(User,Alive);
+		claim_!13(User,Niagree);
+	}
+
+	role Admin
+	{
+		var ni: Nonce;
+		fresh na: Nonce;
+		var ba: Nonce;
+		var pkU: Function;
+		var pkB: Function;
+		const pkA: Function;
+		secret skA: Function;
+		inversekeys (pkA,skA);
+		
+		recv_1 (User,Admin, { usrPrivInfoPrime, ni }pkU(User) );
+		send_2(Admin,User, { hash(usrPrivInfoPrime, na),ni, pkU} skA(Admin) );
+		recv_3 (User,Admin, { na} pkU(User) );
+
+		send_4 (Admin,DistLedger, { hash(usrPrivInfoPrime, na), pkU }skA(Admin) );
+		recv_5(DistLedger,Admin, { hash(na, ba),na, ba} pkB(DistLedger) ,pkA);
+		send_6 (Admin,DistLedger, {ba} skA(Admin));
+
+		claim_!21(Admin,Nisynch);
+		claim_!22(Admin,Alive);
+		claim_!23(Admin,Niagree);
+	}
+
+	role DistLedger
+	{
+		var ab: Nonce;
+		var na:  Nonce;
+		fresh ba: Nonce;
+		var pkU: Function;
+		var pkS: Function;
+		var pkA: Function;
+		const pkB: Function;
+		secret skB: Function;
+		inversekeys (pkB,skB);
+
+		recv_4 (Admin,DistLedger, { hash(usrPrivInfoPrime, na ), pkU}pkA(Admin) );
+		send_5(DistLedger,Admin, { hash(na, ba),na, ba} skB(DistLedger) ,pkA);
+		recv_6 (Admin,DistLedger, {ba} pkA(Admin));
+
+		recv_8 (Server, DistLedger,{(hash(usrPrivInfoPrime, na ),  ba)}pkS(Server));
+		send_9 (DistLedger,Server, ba, pkU);
+		
+		claim_!31(DistLedger,Nisynch);
+		claim_!32(DistLedger,Alive);
+		claim_!33(DistLedger,Niagree);
+		claim_!34(DistLedger,Commit,Admin, hash(usrPrivInfoPrime, na));
+	}
+
+	role Server 
+	{
+		var na:  Nonce;
+		var TS: Timestamp;
+		fresh ba: Nonce;
+		var pkU: Function;
+		const pkS: Function;
+		secret skS: Function;
+		inversekeys (pkS,skS);
+		
+		recv_7 (User, Server, { (hash(usrPrivInfoPrime, na), TS)} pkU(User));
+		send_8 (Server, DistLedger,{(hash(usrPrivInfoPrime, na ), ba)}skS(Server));
+		recv_9 (DistLedger,Server, ba, pkU);
+		match(pkU(User), pkU);
+		claim_!41(Server,Nisynch);
+		claim_!42(Server,Alive);
+		claim_!43(Server,Niagree);
+		claim_!44(Server,Commit,DistLedger, hash(usrPrivInfoPrime, na));
+		
+	}
+	
+}
